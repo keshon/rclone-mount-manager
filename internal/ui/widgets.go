@@ -31,7 +31,6 @@ func RenderUI() {
 
 	style := imgui.CurrentStyle()
 	footerHeight := imgui.FrameHeightWithSpacing() + style.ItemSpacing().Y
-
 	contentHeight := imgui.WindowHeight() - footerHeight - style.WindowPadding().Y*2
 	imgui.BeginChildStrV("MainContent", imgui.Vec2{-1, contentHeight}, imgui.ChildFlagsNone, 0)
 
@@ -57,7 +56,6 @@ func renderHeader() {
 	imgui.Text("🗂 Rclone Mount Manager")
 	imgui.PopFont()
 	imgui.PopStyleColor()
-
 	imgui.Separator()
 }
 
@@ -74,17 +72,13 @@ func renderFooter() {
 	imgui.PopStyleColor()
 
 	imgui.SameLine()
-
 	configButtonText := "Rclone Config"
 	configButtonSize := imgui.CalcTextSizeV(configButtonText, false, 0)
-
 	style := imgui.CurrentStyle()
 	buttonPadding := style.FramePadding().X * 2
-
 	imgui.SetCursorPosX(imgui.WindowWidth() - configButtonSize.X - buttonPadding - style.WindowPadding().X)
 
 	if imgui.Button(configButtonText) {
-		// Launch Rclone config window
 		err := manager.ConfigRemote()
 		if err != nil {
 			App.Status = err.Error()
@@ -100,7 +94,6 @@ func renderConfigSection() {
 	imgui.PopStyleColor()
 
 	renderMountControls()
-
 	imgui.SameLine()
 	imgui.SetNextItemWidth(-1)
 
@@ -125,13 +118,11 @@ func renderConfigSection() {
 			for _, cfg := range filteredConfigs {
 				isSelected := cfg.Name == App.SelectedConfig
 				emoji, col := getRemoteStatusEmoji(cfg.Name), getRemoteStatusColor(cfg.Name)
-
 				imgui.PushStyleColorVec4(imgui.ColText, col)
 				if imgui.SelectableBoolV(fmt.Sprintf("%s %s", emoji, cfg.Name), isSelected, imgui.SelectableFlagsNone, imgui.Vec2{}) {
 					App.SelectedConfig = cfg.Name
 				}
 				imgui.PopStyleColor()
-
 				if isSelected {
 					imgui.SetItemDefaultFocus()
 				}
@@ -139,26 +130,6 @@ func renderConfigSection() {
 		}
 		imgui.EndCombo()
 	}
-}
-
-func getRemoteStatusEmoji(name string) string {
-	if active, ok := ActiveMounts[name]; ok {
-		if active.Progress == "" {
-			return "🔄" // в процессе
-		}
-		return "✅" // подключен
-	}
-	return "💤" // не подключен
-}
-
-func getRemoteStatusColor(name string) imgui.Vec4 {
-	if active, ok := ActiveMounts[name]; ok {
-		if active.Progress == "" {
-			return imgui.Vec4{X: 0.95, Y: 0.85, Z: 0.3, W: 1.0} // жёлтый
-		}
-		return imgui.Vec4{X: 0.2, Y: 0.9, Z: 0.2, W: 1.0} // зелёный
-	}
-	return imgui.Vec4{X: 0.8, Y: 0.8, Z: 0.8, W: 1.0} // серый
 }
 
 func renderMountControls() {
@@ -170,7 +141,6 @@ func renderMountControls() {
 	}
 
 	imgui.BeginDisabledV(App.SelectedConfig == "")
-
 	if isMounted {
 		if imgui.Button("Unmount Remote") {
 			unmountSelected(App.SelectedConfig)
@@ -180,7 +150,6 @@ func renderMountControls() {
 			go mountSelected(App.SelectedConfig)
 		}
 	}
-
 	imgui.EndDisabled()
 }
 
@@ -189,47 +158,86 @@ func renderStatusSection() {
 	imgui.Text("📋 Status")
 	imgui.PopStyleColor()
 
+	if App.SelectedConfig == "" {
+		return
+	}
+
+	active, ok := ActiveMounts[App.SelectedConfig]
+	if !ok {
+		return
+	}
+
+	// Основной статус монтирования
 	statusColor := imgui.Vec4{X: 0.7, Y: 0.7, Z: 0.7, W: 1.0}
 	statusText := "Ready"
-
-	if App.SelectedConfig != "" {
-		if active, ok := ActiveMounts[App.SelectedConfig]; ok {
-			if active.Progress == "" {
-				statusColor = imgui.Vec4{X: 0.9, Y: 0.7, Z: 0.3, W: 1.0}
-				statusText = "Mounting..."
-			} else {
-				statusColor = imgui.Vec4{X: 0.2, Y: 0.8, Z: 0.2, W: 1.0}
-				statusText = "\\\\cloud\\" + App.SelectedConfig
-			}
-		} else {
-			statusText = "Ready"
-			statusColor = imgui.Vec4{X: 0.7, Y: 0.7, Z: 0.7, W: 1.0}
-		}
+	if active.Mounted {
+		statusColor = imgui.Vec4{X: 0.2, Y: 0.8, Z: 0.2, W: 1.0}
+		statusText = "\\\\cloud\\" + App.SelectedConfig
+	} else {
+		statusColor = imgui.Vec4{X: 0.9, Y: 0.7, Z: 0.3, W: 1.0}
+		statusText = "Mounting..."
 	}
 
 	imgui.PushStyleColorVec4(imgui.ColText, statusColor)
 	imgui.TextWrapped(statusText)
 	imgui.PopStyleColor()
 
-	if App.SelectedConfig != "" {
-		if active, ok := ActiveMounts[App.SelectedConfig]; ok {
-			if active.Progress != "" {
-				imgui.PushStyleColorVec4(imgui.ColText, imgui.Vec4{X: 0.6, Y: 0.8, Z: 1.0, W: 1.0})
-				imgui.TextWrapped(active.Progress)
-				imgui.PopStyleColor()
-			}
-		}
+	// Список активных файлов (как в OneDrive/Dropbox)
+	if len(active.Files) == 0 {
+		return
+	}
+	for _, f := range active.Files {
+		imgui.PushStyleColorVec4(imgui.ColText, imgui.Vec4{X: 0.6, Y: 0.8, Z: 1.0, W: 1.0})
+		progressText := fmt.Sprintf("%s %s - %.1f%%, %.2f MB/s, ETA %ds",
+			f.Icon,
+			filepath.Base(f.Name),
+			f.Percentage,
+			f.Speed/1024/1024,
+			f.ETA,
+		)
+		imgui.TextWrapped(progressText)
+		imgui.PopStyleColor()
 	}
 }
 
-func getFilteredConfigs() []rclone.Remote {
+// -------------------- Вспомогательные --------------------
+func getRemoteStatusEmoji(name string) string {
+	if active, ok := ActiveMounts[name]; ok {
+		if len(active.Files) > 0 {
+			return "🔄"
+		}
+		if active.Mounted {
+			return "✅"
+		}
+	}
+	return "💤"
+}
+
+func getRemoteStatusColor(name string) imgui.Vec4 {
+	if active, ok := ActiveMounts[name]; ok {
+		if len(active.Files) > 0 {
+			return imgui.Vec4{X: 0.95, Y: 0.85, Z: 0.3, W: 1.0}
+		}
+		if active.Mounted {
+			return imgui.Vec4{X: 0.2, Y: 0.9, Z: 0.2, W: 1.0}
+		}
+	}
+	return imgui.Vec4{X: 0.8, Y: 0.8, Z: 0.8, W: 1.0}
+}
+
+func getFilteredConfigs() []*rclone.Remote {
 	if searchFilter == "" {
-		return manager.Remotes
+		remotes := make([]*rclone.Remote, len(manager.Remotes))
+		for i := range manager.Remotes {
+			remotes[i] = &manager.Remotes[i]
+		}
+		return remotes
 	}
 
-	var filtered []rclone.Remote
+	var filtered []*rclone.Remote
 	searchLower := strings.ToLower(searchFilter)
-	for _, cfg := range manager.Remotes {
+	for i := range manager.Remotes {
+		cfg := &manager.Remotes[i]
 		if strings.Contains(strings.ToLower(cfg.Name), searchLower) {
 			filtered = append(filtered, cfg)
 		}
@@ -251,9 +259,9 @@ func unmountSelected(configName string) {
 
 func mountSelected(cfgName string) {
 	var cfg *rclone.Remote
-	for _, r := range manager.Remotes {
-		if r.Name == cfgName {
-			cfg = &r
+	for i := range manager.Remotes {
+		if manager.Remotes[i].Name == cfgName {
+			cfg = &manager.Remotes[i]
 			break
 		}
 	}
@@ -268,34 +276,29 @@ func mountSelected(cfgName string) {
 		CacheMode:  "writes",
 		CacheSize:  "500M",
 		CacheAge:   "1m",
-		LogPath:    manager.ConfigPath,
 		CacheDir:   filepath.Join("C:/temp/rclone", cfg.Name),
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
-	progressChan := make(chan string, 100)
 
 	active := &ActiveMount{
-		Mount:    mount,
-		CmdCtx:   cancel,
-		Progress: "",
+		Mount:   mount,
+		CmdCtx:  cancel,
+		Files:   []ActiveFileProgress{}, // <-- инициализация пустого списка
+		Mounted: false,
 	}
 	ActiveMounts[cfg.Name] = active
 
 	go func() {
-		for msg := range progressChan {
-			active.Progress = msg
-		}
-	}()
-
-	go func() {
-		err := manager.Mount(ctx, mount, progressChan)
+		err := manager.Mount(ctx, mount)
 		if err != nil {
 			App.Status = err.Error()
 			delete(ActiveMounts, cfg.Name)
 		} else {
+			if active, ok := ActiveMounts[cfg.Name]; ok {
+				active.Mounted = true
+			}
 			App.Status = fmt.Sprintf("✅ %s mounted successfully", cfg.Name)
-			active.Progress = ""
 		}
 	}()
 }
