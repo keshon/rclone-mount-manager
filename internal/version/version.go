@@ -1,5 +1,7 @@
 package version
 
+import "runtime"
+
 const (
 	AppName        = "Rclone Mount Manager"
 	AppFullName    = "Rclone Mount Manager - GUI tool to manage Rclone mounts on Windows"
@@ -9,6 +11,6 @@ const (
 )
 
 var (
-	BuildDate string
-	GoVersion string
+	BuildDate = ""
+	GoVersion = runtime.Version()
 )
