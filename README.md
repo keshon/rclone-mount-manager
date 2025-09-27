@@ -9,10 +9,9 @@ Provides easy access to mount/unmount operations, status updates, and quick acce
 
 - Mount and unmount Rclone remotes with a single click
 - Live status updates for active mounts
-- Searchable remote configuration list
 - Quick access to Rclone configuration (`rclone config`)
 - Status indicators:
-  - 🔄 Mounting
+  - 🔄 Transfering in progress
   - ✅ Connected
   - 💤 Inactive
 

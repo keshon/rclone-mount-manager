@@ -1,7 +1,10 @@
+// Package ui provides the graphical user interface for the rclone mount manager
+// application using ImGui. It handles window management, DPI detection and scaling,
+// font loading, remote configuration display, mount controls and status information.
 package ui
 
 import (
-	"fmt"
+	"log"
 	"os"
 	"runtime"
 	"strconv"
@@ -11,31 +14,33 @@ import (
 	"github.com/go-gl/glfw/v3.3/glfw"
 )
 
+// DetectDPIScale returns a DPI scale factor for the current system.
+// It uses platform APIs, GLFW, and ImGui to determine scaling.
 func DetectDPIScale() float32 {
 	var scale float32 = 1.0
 
 	if runtime.GOOS == "windows" {
 		if winScale := getWindowsDPIScale(); winScale > 1.0 {
 			scale = winScale
-			fmt.Printf("Windows DPI scale: %.2f\n", scale)
+			log.Printf("Windows DPI scale: %.2f\n", scale)
 		}
 	}
 
 	if window := getCurrentGLFWWindow(); window != nil {
 		contentScaleX, contentScaleY := window.GetContentScale()
 		glfwScale := (contentScaleX + contentScaleY) / 2.0
-		fmt.Printf("GLFW content scale: X=%.2f, Y=%.2f, avg=%.2f\n", contentScaleX, contentScaleY, glfwScale)
+		log.Printf("GLFW content scale: X=%.2f, Y=%.2f, avg=%.2f\n",
+			contentScaleX, contentScaleY, glfwScale)
 		if glfwScale > scale && glfwScale <= 4.0 {
 			scale = glfwScale
 		}
 	}
 
-	io := imgui.CurrentIO()
-	if io != nil {
+	if io := imgui.CurrentIO(); io != nil {
 		fbScale := io.DisplayFramebufferScale()
 		if fbScale.X > 0 && fbScale.Y > 0 {
 			imguiScale := (fbScale.X + fbScale.Y) / 2.0
-			fmt.Printf("ImGui framebuffer scale: avg=%.2f\n", imguiScale)
+			log.Printf("ImGui framebuffer scale: avg=%.2f\n", imguiScale)
 			if imguiScale > scale {
 				scale = imguiScale
 			}
@@ -68,11 +73,13 @@ func DetectDPIScale() float32 {
 	return scale
 }
 
+// getCurrentGLFWWindow returns the current GLFW window, or nil if unavailable.
 func getCurrentGLFWWindow() *glfw.Window {
-	// TODO: expose actual window from backend if needed
 	return nil
 }
 
+// getWindowsDPIScale returns the DPI scale factor on Windows.
+// Falls back to 1.0 if DPI cannot be determined or on other OSes.
 func getWindowsDPIScale() float32 {
 	user32 := syscall.NewLazyDLL("user32.dll")
 	shcore := syscall.NewLazyDLL("shcore.dll")
@@ -98,10 +105,12 @@ func getWindowsDPIScale() float32 {
 		}
 	}
 
-	_ = shcore // reserved for GetDpiForMonitor
+	_ = shcore
 	return 1.0
 }
 
+// getWindowsEnvironmentDPIScale returns a DPI scale from environment variables.
+// Checks QT_SCALE_FACTOR and GDK_SCALE. Defaults to 1.0.
 func getWindowsEnvironmentDPIScale() float32 {
 	if scaleEnv := os.Getenv("QT_SCALE_FACTOR"); scaleEnv != "" {
 		if scale, err := strconv.ParseFloat(scaleEnv, 32); err == nil {

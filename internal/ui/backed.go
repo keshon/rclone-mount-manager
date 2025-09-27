@@ -1,3 +1,6 @@
+// Package ui provides the graphical user interface for the rclone mount manager
+// application using ImGui. It handles window management, DPI detection and scaling,
+// font loading, remote configuration display, mount controls and status information.
 package ui
 
 import (
@@ -8,15 +11,19 @@ import (
 	"github.com/AllenDang/cimgui-go/imgui"
 )
 
-var currentBackend backend.Backend[glfwbackend.GLFWWindowFlags]
+// Backend and scaling configuration.
+var (
+	currentBackend backend.Backend[glfwbackend.GLFWWindowFlags]        // active GLFW backend
+	baseFontSize   float32                                      = 16.0 // base font size
+	dpiScale       float32                                      = 1.0  // current DPI scale
+)
 
-var baseFontSize float32 = 16.0
-var dpiScale float32 = 1.0
-
+// InitBackend initializes the GLFW backend and creates the main window.
+// It applies DPI-aware styling, sets window size limits, and installs
+// file drop and close callbacks.
 func InitBackend(windowTitle string, width, height int) {
 	currentBackend, _ = backend.CreateBackend(glfwbackend.NewGLFWBackend())
 	currentBackend.SetBgColor(imgui.NewVec4(0.1, 0.12, 0.15, 1.0))
-
 	currentBackend.CreateWindow(windowTitle, width, height)
 	currentBackend.SetWindowSizeLimits(600, 800, -1, -1)
 	currentBackend.SetDropCallback(OnFileDrop)
@@ -28,6 +35,7 @@ func InitBackend(windowTitle string, width, height int) {
 	ApplyGUIStyles(baseFontSize, dpiScale)
 }
 
+// UpdateDPIScale detects DPI changes and reapplies styling if needed.
 func UpdateDPIScale() {
 	newScale := DetectDPIScale()
 	if newScale != dpiScale {
